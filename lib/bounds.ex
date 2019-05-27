@@ -89,6 +89,10 @@ defmodule Bounds do
     Enum.filter(enum, &range?/1)
 
 
+  def from_binary(bin) when is_binary(bin), do:
+    %__MODULE__{upper: byte_size(bin)}
+
+
   def size(%__MODULE__{lower: lower, upper: upper}), do: upper - lower
 
 
