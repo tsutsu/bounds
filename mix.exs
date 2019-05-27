@@ -10,7 +10,8 @@ defmodule Bounds.MixProject do
     package: package(),
     deps: deps(),
     name: "Bounds",
-    source_url: "https://github.com/tsutsu/bounds"
+    source_url: "https://github.com/tsutsu/bounds",
+    docs: docs()
   ]
 
   def application, do: [
@@ -29,5 +30,9 @@ defmodule Bounds.MixProject do
   defp package, do: [
     licenses: ["MIT"],
     links: %{"GitHub" => "https://github.com/tsutsu/bounds"}
+  ]
+
+  defp docs, do: [
+    main: "Bounds"
   ]
 end
