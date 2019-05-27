@@ -6,7 +6,11 @@ defmodule Bounds.MixProject do
     version: "0.1.0",
     elixir: "~> 1.8",
     start_permanent: Mix.env() == :prod,
-    deps: deps()
+    description: description(),
+    package: package(),
+    deps: deps(),
+    name: "Bounds",
+    source_url: "https://github.com/tsutsu/bounds"
   ]
 
   def application, do: [
@@ -15,5 +19,15 @@ defmodule Bounds.MixProject do
 
   defp deps, do: [
     {:ex_doc, "~> 0.20.2", only: :dev, runtime: false}
+  ]
+
+  defp description, do: """
+    Bounds is a library for generic Elixir intervals, which formalizes Erlang's `{pos, len}`
+    tuples into an ADT with many supported operations.
+  """
+
+  defp package, do: [
+    licenses: ["MIT"],
+    links: %{"GitHub" => "https://github.com/tsutsu/bounds"}
   ]
 end
