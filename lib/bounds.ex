@@ -92,7 +92,7 @@ defmodule Bounds do
     {lower, upper - lower}
 
 
-  @doc "Creates a [point-bounded](#point-bounds) Bounds value equivalent to the integer offset `point`."
+  @doc "Creates a [point-bounded](#module-point-bounds) Bounds value equivalent to the integer offset `point`."
   def from_integer(point) when is_integer(point) and point >= 0, do:
     %__MODULE__{lower: point, upper: point}
 
@@ -102,9 +102,9 @@ defmodule Bounds do
   def point?(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do: false
 
   @doc ~S"""
-  Given a [point-bounded](#point-bounds) Bounds value, returns the integer offset equivalent to it.
+  Given a [point-bounded](#module-point-bounds) Bounds value, returns the integer offset equivalent to it.
 
-  Raises an exception if the given Bounds value is not [point-bounded](#point-bounds).
+  Raises an exception if the given Bounds value is not [point-bounded](#module-point-bounds).
   """
   def to_integer(%__MODULE__{lower: point, upper: point}), do: point
   def to_integer(%__MODULE__{lower: lower, upper: upper} = bounds) when lower < upper, do:
@@ -112,7 +112,7 @@ defmodule Bounds do
 
   @doc ~S"""
   Filters the passed `Map` or `Enumerable` value for only the Bounds values
-  which are [point-bounded](#point-bounds).
+  which are [point-bounded](#module-point-bounds).
   """
   def points(m) when is_map(m), do:
     Map.new(Enum.filter(m, fn {_, bounds} -> point?(bounds) end))
@@ -122,7 +122,7 @@ defmodule Bounds do
 
   @doc ~S"""
   Filters the passed `Map` or `Enumerable` value for only the Bounds values
-  which are [point-bounded](#point-bounds), additionally casting them to integer offsets.
+  which are [point-bounded](#module-point-bounds), additionally casting them to integer offsets.
   """
   def integers(m) when is_map(m) do
     Enum.flat_map(m, fn
@@ -145,7 +145,7 @@ defmodule Bounds do
 
 
   @doc ~S"""
-  Determines whether a Bounds value is [range-bounded](#point-bounds) —
+  Determines whether a Bounds value is [range-bounded](#module-point-bounds) —
   i.e. whether it has a nonzero `size/1`.
   """
   def range?(%__MODULE__{lower: point, upper: point}), do: false
@@ -153,10 +153,10 @@ defmodule Bounds do
 
 
   @doc ~S"""
-  Given a [range-bounded](#point-bounds) Bounds value, returns the `Range` value equivalent
+  Given a [range-bounded](#module-point-bounds) Bounds value, returns the `Range` value equivalent
   to it.
 
-  Raises an exception if the given Bounds value is not [range-bounded](#point-bounds).
+  Raises an exception if the given Bounds value is not [range-bounded](#module-point-bounds).
   """
   def to_range(%__MODULE__{lower: point, upper: point} = bounds), do:
     raise ArgumentError, "cannot convert #{inspect bounds} to Range"
@@ -165,7 +165,7 @@ defmodule Bounds do
 
 
   @doc ~S"""
-  Filters the passed `Map` or `Enumerable` value for only [range-bounded](#point-bounds) Bounds values.
+  Filters the passed `Map` or `Enumerable` value for only [range-bounded](#module-point-bounds) Bounds values.
   """
   def ranges(m) when is_map(m), do:
     Map.new(Enum.filter(m, fn {_, bounds} -> range?(bounds) end))
