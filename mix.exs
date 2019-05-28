@@ -1,9 +1,11 @@
 defmodule Bounds.MixProject do
   use Mix.Project
 
+  @version "0.1.1"
+
   def project, do: [
     app: :bounds,
-    version: "0.1.1",
+    version: @version,
     elixir: "~> 1.8",
     start_permanent: Mix.env() == :prod,
     description: description(),
@@ -19,7 +21,8 @@ defmodule Bounds.MixProject do
   ]
 
   defp deps, do: [
-    {:ex_doc, "~> 0.20.2", only: :dev, runtime: false}
+    {:ex_doc, "~> 0.20.2", only: :dev, runtime: false},
+    {:version_tasks, "~> 0.11.0", only: :dev, runtime: false}
   ]
 
   defp description, do: """

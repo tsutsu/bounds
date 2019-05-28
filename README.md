@@ -11,9 +11,8 @@ Bounds can be installed by adding `bounds` to your list of dependencies
 in `mix.exs`:
 
 ```elixir
-def deps do
-  [
-    {:bounds, "~> 0.1.1"}
-  ]
+@deps [
+  bounds: "~> 0.1.1"
+]
 end
 ```
