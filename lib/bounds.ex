@@ -10,14 +10,30 @@ defmodule Bounds do
 
   * A Bounds value always has non-negative values. (A Range value may represent negative values.)
 
-  Bounds values may therefore represent single points, equivalent to `{pos, 0}` tuples.
+  ## Point Bounds
 
-  Many functions in `Bounds` return these "point-bounds" when used near the Bounds value's end points.
-  Because point-bounds require special handling and aren't always useful, functions like `point?/1`,
-  `range?/1`, `points/1`, and `ranges/1` can be used to filter point-bounds out of your final result.
+  The relaxation of the nonzero-size rule from Range, means that Bounds values may represent single points,
+  equivalent to `{pos, 0}` tuples. Such Bounds values are said to be "point bounds" or "point-bounded."
+  A Bounds value that is not point-bounded is said to be a "range bound" or "range-bounded", as there exists
+  an equivalent Range value to it.
 
-  However, you don't need to filter point-bounds out of intermediate results; Bounds handles point-bounds
-  as inputs to further calculations just fine.
+  Many functions in `Bounds` return point bounds when used near the Bounds value's end points.
+  For example, `difference/2` subtracts an open interval from a closed interval; if used with
+  the same argument on both sides, the mathematical result will be `[a, b] - (a, b) = {(a, a), (b, b)}` —
+  a list of two point bounds representing the left-over endpoints from the closed interval.
+
+  This is an implementation choice made to allow the user of Bounds to not worry about whether their
+  Bounds values represent open or closed intervals. Rather than explicitly defining Bounds values
+  as representing open, half-closed, or closed intervals at all times, Bounds values instead represent
+  generic intervals, which the algorithms in `Bounds` interpret as open, half-closed, or closed, either
+  because that is the only useful interpretation for the given operation, or because a particular
+  interpretation yields a value containing the most information—information from which the results of
+  operations on the other types of intervals can be deduced as corollaries.
+
+  To return to the `difference/2` example, if you want to compute the difference between two closed
+  intervals represented as Bounds values, you can pass the results of `difference/2` to the function
+  `ranges/1` to find only the range-bounded (i.e. not point-bounded) elements, or use the predicates
+  `point?/1` or `range?/1` to filter for these values yourself.
 
   ## Implementation
 
@@ -87,9 +103,9 @@ defmodule Bounds do
 
 
   @doc ~S"""
-  Returns the integer point that a given Bounds value represents.
+  Given a [point-bounded](#point-bounds) Bounds value, returns the integer offset equivalent to it.
 
-  Raises an exception if the given Bounds value does not represent a point.
+  Raises an exception if the given Bounds value is not [point-bounded](#point-bounds).
   """
   def to_point!(%__MODULE__{lower: point, upper: point}), do: point
   def to_point!(%__MODULE__{lower: lower, upper: upper} = bounds) when lower < upper, do:
@@ -98,7 +114,7 @@ defmodule Bounds do
 
   @doc ~S"""
   Filters the passed `Map` or `Enumerable` value for only the Bounds values
-  which are zero-length (i.e. points.)
+  which are [point-bounded](#point-bounds).
   """
   def points(m) when is_map(m), do:
     Map.new(Enum.filter(m, fn {_, bounds} -> point?(bounds) end))
@@ -111,26 +127,28 @@ defmodule Bounds do
     %__MODULE__{lower: first, upper: last + 1}
 
 
-  @doc "Determines whether a Bounds value is a valid `Range` (i.e. has nonzero size.)"
+  @doc ~S"""
+  Determines whether a Bounds value is [range-bounded](#point-bounds) —
+  i.e. whether it has a nonzero `size/1`.
+  """
   def range?(%__MODULE__{lower: point, upper: point}), do: false
   def range?(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do: true
 
 
   @doc ~S"""
-  Returns the `Range` of integer points that a given Bounds value represents.
+  Given a [range-bounded](#point-bounds) Bounds value, returns the `Range` value equivalent
+  to it.
 
-  Raises an exception if the given Bounds value does not represent a range of points (i.e.
-  because it instead represents a single point.)
+  Raises an exception if the given Bounds value is not [range-bounded](#point-bounds).
   """
   def to_range(%__MODULE__{lower: point, upper: point} = bounds), do:
     raise ArgumentError, "cannot convert #{inspect bounds} to Range"
   def to_range(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do:
-    {lower, upper - 1}
+    %Range{first: lower, last: (upper - 1)}
 
 
   @doc ~S"""
-  Filters the passed `Map` or `Enumerable` value for only the Bounds values
-  which are valid `Range`s (i.e. which are of nonzero length.)
+  Filters the passed `Map` or `Enumerable` value for only [range-bounded](#point-bounds) Bounds values.
   """
   def ranges(m) when is_map(m), do:
     Map.new(Enum.filter(m, fn {_, bounds} -> range?(bounds) end))
@@ -337,12 +355,14 @@ defmodule Bounds do
   @doc ~S"""
   Returns two sub-intervals representing the result of "breaking" `bounds` at a given position.
 
-  The second argument `point_or_idx_or_offset` can take a few forms, each with a different result:
+  The second argument can take a few forms, each with a different result:
 
-  * If it is an integer ≥ 0, it will be used to calculate a point to break relative to `bounds.lower`;
-  * If it is an integer < 0, it will be used to calculate a point to break relative to `bounds.upper`;
-  * If it is a Bounds value and `Bounds.point?(bounds)` is true, it will be used as an absolute point to
-    break at.
+  * If the second argument is an integer ≥ 0, it will be used to calculate a point to break at,
+    relative to `bounds.lower`;
+  * If the second argument is an integer < 0, it will be used to calculate a point to break at,
+    relative to `bounds.upper`;
+  * If the second argument is a Bounds value *and* `Bounds.point?(bounds)` is true, it will be used
+    as an absolute point to break at.
 
   ## Examples
 
