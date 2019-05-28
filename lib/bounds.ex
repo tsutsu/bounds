@@ -101,16 +101,14 @@ defmodule Bounds do
   def point?(%__MODULE__{lower: point, upper: point}), do: true
   def point?(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do: false
 
-
   @doc ~S"""
   Given a [point-bounded](#point-bounds) Bounds value, returns the integer offset equivalent to it.
 
   Raises an exception if the given Bounds value is not [point-bounded](#point-bounds).
   """
-  def to_point!(%__MODULE__{lower: point, upper: point}), do: point
-  def to_point!(%__MODULE__{lower: lower, upper: upper} = bounds) when lower < upper, do:
-    raise ArgumentError, "cannot convert #{inspect bounds} to point"
-
+  def to_integer(%__MODULE__{lower: point, upper: point}), do: point
+  def to_integer(%__MODULE__{lower: lower, upper: upper} = bounds) when lower < upper, do:
+    raise ArgumentError, "cannot convert #{inspect bounds} to integer"
 
   @doc ~S"""
   Filters the passed `Map` or `Enumerable` value for only the Bounds values
@@ -199,8 +197,9 @@ defmodule Bounds do
       iex> Bounds.from_binary("abcdEFGH") |> Bounds.stepwise(4) |> Enum.to_list()
       [%Bounds{lower: 0, upper: 4}, %Bounds{lower: 4, upper: 8}]
   """
-  def stepwise(%__MODULE__{} = bounds, step_size \\ 1) when is_integer(step_size) and step_size >= 1 do
-    %Bounds.Stepwise{bounds: bounds, step: step_size}
+  def chunk_every(%__MODULE__{} = bounds, step, opts \\ []) when is_integer(step) and step >= 1 and is_list(opts) do
+    partial_strategy = Keyword.get(opts, :partials, :return)
+    Bounds.Chunked.new(bounds, step, partial_strategy)
   end
 
 

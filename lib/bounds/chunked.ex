@@ -1,24 +1,35 @@
-defmodule Bounds.Stepwise do
+defmodule Bounds.Chunked do
   defstruct [:bounds, :step]
 
-  def new(%Bounds{} = bounds, step) when is_integer(step) and step >= 1 do
-    %__MODULE__{bounds: bounds, step: step}
+  def new(%Bounds{lower: lower, upper: upper} = bounds, step, partial_strategy) when is_integer(step) and step >= 1 do
+    case {rem(upper - lower, step), partial_strategy} do
+      {0, _} ->
+        %Bounds.Chunked{bounds: bounds, step: step}
+      {_, :discard} ->
+        %Bounds.Chunked{bounds: bounds, step: step}
+      {n, :return} when n > 0 ->
+        last_part = %Bounds{lower: upper - n, upper: upper}
+        %Bounds.ExtendedEnumerable{most: %Bounds.Chunked{bounds: bounds, step: step}, extra: last_part}
+      {n, :extend} when n > 0 ->
+        last_part = %Bounds{lower: upper - n, upper: upper - n + step}
+        %Bounds.ExtendedEnumerable{most: %Bounds.Chunked{bounds: bounds, step: step}, extra: last_part}
+    end
   end
 end
 
-defimpl Enumerable, for: Bounds.Stepwise do
+defimpl Enumerable, for: Bounds.Chunked do
   alias Bounds
-  alias Bounds.Stepwise
+  alias Bounds.Chunked
 
-  def count(%Stepwise{bounds: %Bounds{lower: lower, upper: upper}, step: step}) do
+  def count(%Chunked{bounds: %Bounds{lower: lower, upper: upper}, step: step}) do
     {:ok, div(upper - lower, step)}
   end
 
-  def member?(%Stepwise{bounds: %Bounds{lower: lower, upper: upper}, step: step}, %Bounds{lower: a, upper: b}) do
+  def member?(%Chunked{bounds: %Bounds{lower: lower, upper: upper}, step: step}, %Bounds{lower: a, upper: b}) do
     {:ok, (a >= lower) and (b <= upper) and ((b - a) == step) and (rem(a - lower, step) == 0) and (rem(b - lower, step) == 0)}
   end
 
-  def reduce(%Stepwise{bounds: %Bounds{lower: lower, upper: upper}, step: step}, acc, fun) do
+  def reduce(%Chunked{bounds: %Bounds{lower: lower, upper: upper}, step: step}, acc, fun) do
     reduce(lower, upper, step, acc, fun)
   end
 
@@ -34,7 +45,7 @@ defimpl Enumerable, for: Bounds.Stepwise do
     reduce(next, upper, step, fun.(val, acc), fun)
   end
 
-  def slice(%Stepwise{bounds: %Bounds{lower: lower, upper: upper}, step: step_size}) do
+  def slice(%Chunked{bounds: %Bounds{lower: lower, upper: upper}, step: step_size}) do
     count = div(upper - lower, step_size)
 
     slicer = fn offset, len ->
