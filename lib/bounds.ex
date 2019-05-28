@@ -12,6 +12,13 @@ defmodule Bounds do
 
   Bounds values may therefore represent single points, equivalent to `{pos, 0}` tuples.
 
+  Many functions in `Bounds` return these "point-bounds" when used near the Bounds value's end points.
+  Because point-bounds require special handling and aren't always useful, functions like `point?/1`,
+  `range?/1`, `points/1`, and `ranges/1` can be used to filter point-bounds out of your final result.
+
+  However, you don't need to filter point-bounds out of intermediate results; Bounds handles point-bounds
+  as inputs to further calculations just fine.
+
   ## Implementation
 
   Bounds values are normalized as an interval `[lower, upper]` for convenience of calculation. All functions
