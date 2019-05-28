@@ -92,8 +92,8 @@ defmodule Bounds do
     {lower, upper - lower}
 
 
-  @doc "Creates a zero-length Bounds value centered on the integer `point`."
-  def at_point(point) when is_integer(point) and point >= 0, do:
+  @doc "Creates a [point-bounded](#point-bounds) Bounds value equivalent to the integer offset `point`."
+  def from_integer(point) when is_integer(point) and point >= 0, do:
     %__MODULE__{lower: point, upper: point}
 
 
@@ -118,6 +118,25 @@ defmodule Bounds do
     Map.new(Enum.filter(m, fn {_, bounds} -> point?(bounds) end))
   def points(enum), do:
     Enum.filter(enum, &point?/1)
+
+
+  @doc ~S"""
+  Filters the passed `Map` or `Enumerable` value for only the Bounds values
+  which are [point-bounded](#point-bounds), additionally casting them to integer offsets.
+  """
+  def integers(m) when is_map(m) do
+    Enum.flat_map(m, fn
+      {k, %Bounds{lower: point, upper: point}} -> [{k, point}]
+      _ -> []
+    end)
+    |> Map.new()
+  end
+  def integers(enum) do
+    Enum.flat_map(enum, fn
+      %Bounds{lower: point, upper: point} -> [point]
+      _ -> []
+    end)
+  end
 
 
   @doc "Converts a `Range` to an equivalent Bounds value."
