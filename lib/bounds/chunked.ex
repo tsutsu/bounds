@@ -1,4 +1,6 @@
 defmodule Bounds.Chunked do
+  @moduledoc false
+
   defstruct [:bounds, :step]
 
   def new(%Bounds{lower: lower, upper: upper} = bounds, step, partial_strategy) when is_integer(step) and step >= 1 do

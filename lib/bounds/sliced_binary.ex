@@ -4,6 +4,7 @@ defmodule Bounds.SlicedBinary do
     bounds: %Bounds{}
   ]
 
+  @doc false
   def base(bin) when is_binary(bin) do
     %__MODULE__{bin: bin, bounds: %Bounds{lower: 0, upper: byte_size(bin)}}
   end

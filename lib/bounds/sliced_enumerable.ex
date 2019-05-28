@@ -4,6 +4,7 @@ defmodule Bounds.SlicedEnumerable do
     bounds: %Bounds{}
   ]
 
+  @doc false
   def base(enum, size \\ nil) do
     enum_size = case {Enumerable.slice(enum), size} do
       {{:ok, count_from_enum, _}, _} ->

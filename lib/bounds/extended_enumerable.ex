@@ -1,4 +1,6 @@
 defmodule Bounds.ExtendedEnumerable do
+  @moduledoc false
+
   defstruct [:most, :extra]
 end
 
