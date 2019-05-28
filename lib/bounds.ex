@@ -61,7 +61,7 @@ defmodule Bounds do
 
   A common use-case is enumerating all half-closed intervals of some length `n` (e.g. `[lower, lower + n)`)
   which are contained by a given Bounds value. For example, if the Bounds value represents the bounds of a binary,
-  then you might want the bounds of each byte of the binary: `[0, 1)`, `[1, 2)`, etc. The functions `stepwise/2`,
+  then you might want the bounds of each byte of the binary: `[0, 1)`, `[1, 2)`, etc. The functions `chunk_every/2`,
   `split_stepwise/2`, and `partitioned/3` will help with this.
   """
 
@@ -190,11 +190,11 @@ defmodule Bounds do
 
   Get the bounds of each single byte of a binary:
 
-      iex> Bounds.from_binary("foo") |> Bounds.stepwise(1) |> Enum.to_list()
+      iex> Bounds.from_binary("foo") |> Bounds.chunk_every(1) |> Enum.to_list()
       [%Bounds{lower: 0, upper: 1}, %Bounds{lower: 1, upper: 2}, %Bounds{lower: 2, upper: 3}]
 
   Get the bounds of a sequence of 32-bit values in a binary:
-      iex> Bounds.from_binary("abcdEFGH") |> Bounds.stepwise(4) |> Enum.to_list()
+      iex> Bounds.from_binary("0123456789") |> Bounds.chunk_every(4, partials: :discard) |> Enum.to_list()
       [%Bounds{lower: 0, upper: 4}, %Bounds{lower: 4, upper: 8}]
   """
   def chunk_every(%__MODULE__{} = bounds, step, opts \\ []) when is_integer(step) and step >= 1 and is_list(opts) do
@@ -207,7 +207,7 @@ defmodule Bounds do
   Splits a Bounds value into three parts, returned as a map with the following keys:
 
   * `:whole`: the bounds of the contiguous set of values whose bounds are both 1. within the original bounds,
-    and 2. divisible by `step_size`. This is equivalent to the `union/2` of the `stepwise/2`
+    and 2. divisible by `step_size`. This is equivalent to the `concat/2`enation of the `chunk_every/2`
     enumeration of the given `bounds` at the given `step_size`.
   * `:partial_before`: the interval extending from the beginning of the original bounds, to the
     beginning of `whole`.
