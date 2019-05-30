@@ -192,6 +192,177 @@ defmodule Bounds do
 
 
   @doc ~S"""
+  Determines whether the Bounds values `a` and `b` have no points in common when both
+  are interpreted as half-closed intervals.
+
+  See also: `overlap?/2`
+
+  ## Examples
+
+  Disjoint values succeed:
+
+      iex> Bounds.disjoint?(Bounds.from_range(1..5), Bounds.from_range(4..10))
+      false
+
+      iex> Bounds.disjoint?(Bounds.from_range(1..5), Bounds.from_range(5..10))
+      false
+
+  Everything else fails:
+
+      iex> Bounds.disjoint?(Bounds.from_range(1..5), Bounds.from_range(6..10))
+      true
+
+      iex> Bounds.disjoint?(Bounds.from_range(1..10), Bounds.from_range(1..10))
+      false
+
+      iex> Bounds.disjoint?(Bounds.from_range(1..10), Bounds.from_range(3..6))
+      false
+  """
+  def disjoint?(a, b)
+  def disjoint?(%__MODULE__{lower: a_l, upper: a_u}, %__MODULE__{lower: b_l, upper: b_u}), do:
+    a_l >= b_u or b_l >= a_u
+
+
+  @doc ~S"""
+  Determines whether the Bounds values `a` and `b`, have any point in common when both
+  are interpreted as half-closed intervals.
+
+  See also: `disjoint?/2`
+
+  ## Examples
+
+  Disjoint values fail:
+
+      iex> Bounds.overlap?(Bounds.from_range(1..5), Bounds.from_range(4..10))
+      true
+
+      iex> Bounds.overlap?(Bounds.from_range(1..5), Bounds.from_range(5..10))
+      true
+
+  Everything else succeeds:
+
+      iex> Bounds.overlap?(Bounds.from_range(1..5), Bounds.from_range(6..10))
+      false
+
+      iex> Bounds.overlap?(Bounds.from_range(1..10), Bounds.from_range(1..10))
+      true
+
+      iex> Bounds.overlap?(Bounds.from_range(1..10), Bounds.from_range(3..6))
+      true
+  """
+  def overlap?(a, b)
+  def overlap?(%__MODULE__{lower: a_l, upper: a_u}, %__MODULE__{lower: b_l, upper: b_u}), do:
+    a_l < b_u and b_l < a_u
+
+
+
+  @doc ~S"""
+  Determines whether the Bounds values `a` and `b` (both interpreted as half-closed
+  intervals) can be joined to form a single larger interval, with no discontinuities
+  or overlap.
+
+  See also: `overlap?/2`, `disjoint?/2`, `subset?/2`
+
+  ## Examples
+
+  Disjoint intervals fail:
+
+      iex> Bounds.contiguous?(Bounds.new(0, 4), Bounds.new(5, 5))
+      false
+
+  Overlapping intervals fail:
+
+      iex> Bounds.contiguous?(Bounds.new(0, 6), Bounds.new(5, 5))
+      false
+
+  Contiguous intervals succeed:
+
+      iex> Bounds.contiguous?(Bounds.new(0, 5), Bounds.new(5, 5))
+      true
+  """
+  def contiguous?(a, b)
+  def contiguous?(%__MODULE__{upper: common}, %__MODULE__{lower: common}), do: true
+  def contiguous?(%__MODULE__{}, %__MODULE__{}), do: false
+
+
+  @doc ~S"""
+  Determines whether the endpoints of the Bounds value `part` are entirely contained
+  within the endpoints of the Bounds value `whole`, when both are interpreted as
+  closed intervals.
+
+  See also: `strict_subset?/2`
+
+  ## Examples
+
+  Disjoint values fail:
+
+      iex> Bounds.subset?(Bounds.from_range(1..5), Bounds.from_range(4..10))
+      false
+
+      iex> Bounds.subset?(Bounds.from_range(1..5), Bounds.from_range(5..10))
+      false
+
+  Merely overlapping values fail:
+
+      iex> Bounds.subset?(Bounds.from_range(1..5), Bounds.from_range(6..10))
+      false
+
+  Strict subsets succeed:
+
+      iex> Bounds.subset?(Bounds.from_range(1..10), Bounds.from_range(3..6))
+      true
+
+  As do non-strict subsets:
+
+      iex> Bounds.subset?(Bounds.from_range(1..10), Bounds.from_range(1..10))
+      true
+
+  """
+  def subset?(whole, part)
+  def subset?(%__MODULE__{lower: w_l, upper: w_u}, %__MODULE__{lower: p_l, upper: p_u}), do:
+    p_l >= w_l and p_u <= w_u
+
+
+
+  @doc ~S"""
+  Determines whether the endpoints of the Bounds value `part` are entirely contained
+  within the endpoints of the Bounds value `whole`, when both are interpreted as
+  closed intervals. Has the additional constraint that the bounds must not be equal.
+
+  See also: `subset?/2`
+
+  ## Examples
+
+  Disjoint values fail:
+
+      iex> Bounds.strict_subset?(Bounds.from_range(1..5), Bounds.from_range(4..10))
+      false
+
+      iex> Bounds.strict_subset?(Bounds.from_range(1..5), Bounds.from_range(5..10))
+      false
+
+  Merely overlapping values fail:
+
+      iex> Bounds.strict_subset?(Bounds.from_range(1..5), Bounds.from_range(6..10))
+      false
+
+  Strict subsets succeed:
+
+      iex> Bounds.strict_subset?(Bounds.from_range(1..10), Bounds.from_range(3..6))
+      true
+
+  But non-strict subsets fail:
+
+      iex> Bounds.strict_subset?(Bounds.from_range(1..10), Bounds.from_range(1..10))
+      false
+
+  """
+  def strict_subset?(whole, part)
+  def strict_subset?(%__MODULE__{lower: w_l, upper: w_u}, %__MODULE__{lower: p_l, upper: p_u}), do:
+    (p_l >= w_l and p_u < w_u) or (p_l > w_l and p_u <= w_u)
+
+
+  @doc ~S"""
   Returns a `Bounds.Stepwise` decorator value, which implements `Enumerable`.
 
   The values enumerated from a `Bounds.Stepwise` decorator are themselves Bounds values,
