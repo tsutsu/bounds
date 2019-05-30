@@ -595,10 +595,28 @@ defmodule Bounds do
   #   |> Enum.reverse()
   # end
 
+  @doc ~S"""
+  Merges the contiguous intervals `a` and `b` into a single interval containing the superset
+  of the points of both intervals.
 
-  def concat(%Bounds{} = bounds_a, %Bounds{} = bounds_b), do:
-    concat_all(order_pair(bounds_a, bounds_b))
-  def concat(bounds_enum), do:
+  Raises a `Bounds.DisjointError` exception if `a` and `b` are not contiguous intervals.
+
+  See also: `contiguous?/2`
+  """
+  def join(%Bounds{} = a, %Bounds{} = b), do:
+    concat_all(order_pair(a, b))
+
+  @doc ~S"""
+  Merges an enumerable of contiguous intervals (order ignored) defined by `bounds_enum`
+  into a single interval containing the superset of the points of all the intervals
+  provided.
+
+  Raises a `Bounds.DisjointError` exception if there would be any discontinuities
+  in the resulting interval.
+
+  See also: `join/2`, `contiguous?/2`
+  """
+  def join(bounds_enum), do:
     concat_all(Enum.sort(bounds_enum))
 
   defp concat_all(sorted_bounds_enum) do
