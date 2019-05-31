@@ -574,6 +574,14 @@ defmodule Bounds do
 
       iex> Bounds.split_at(%Bounds{lower: 0, upper: 10}, 0)
       [%Bounds{lower: 0, upper: 0}, %Bounds{lower: 0, upper: 10}]
+
+  If a relative offset is past the end of the original bounds (in either direction), the original bounds will be returned:
+
+      iex> Bounds.split_at(%Bounds{lower: 0, upper: 10}, 20)
+      [%Bounds{lower: 0, upper: 10}]
+
+      iex> Bounds.split_at(%Bounds{lower: 0, upper: 10}, -20)
+      [%Bounds{lower: 0, upper: 10}]
   """
   def split_at(bounds, point_or_idx_or_offset)
   def split_at(%__MODULE__{lower: lower, upper: upper} = bounds, %__MODULE__{lower: point, upper: point}) when point >= lower and point <= upper, do:
@@ -582,6 +590,8 @@ defmodule Bounds do
     split_at(bounds, (upper - lower) + offset)
   def split_at(%__MODULE__{lower: lower, upper: upper}, at_idx) when is_integer(at_idx) and at_idx >= 0 and at_idx <= (upper - lower), do:
     uniq_pair(%__MODULE__{lower: lower, upper: lower + at_idx}, %__MODULE__{lower: lower + at_idx, upper: upper})
+  def split_at(%__MODULE__{} = bounds, at_idx) when is_integer(at_idx), do:
+    [bounds]
 
 
   # def partition(@empty = b, _at_idxs), do: b
