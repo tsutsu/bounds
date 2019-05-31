@@ -1,0 +1,10 @@
+#!/bin/sh
+
+mkdir -p "var"
+
+for step in 1 2 3 4 5 6; do
+  path_base="var/bounds_map${step}"
+  mix run scripts/render_map_edges.exs "${step}" "${path_base}.gv"
+  dot "${path_base}.gv" -Gconcentrate=true -Tpdf -o "${path_base}.pdf"
+  open "${path_base}.pdf"
+done
