@@ -1,0 +1,67 @@
+{
+	"folders":
+	[
+		{
+			"path": ".",
+			"name": "bounds",
+			"folder_exclude_patterns": [
+				".sublime",
+				"_build",
+				"rel",
+				"deps",
+				".git"
+			],
+
+			"file_exclude_patterns": [
+				"*.sublime-project",
+				"*.sublime-workspace",
+				".git",
+				"mix.lock"
+			]
+		}
+	],
+
+	"settings": {
+		"tab_size": 2,
+		"translate_tabs_to_spaces": true,
+		"default_line_ending": "unix",
+		"ensure_newline_at_eof_on_save": true,
+		"trim_trailing_white_space_on_save": true
+	},
+
+	"build_systems": [
+		{
+			"name": "Mix: Compile",
+			"working_dir": "${project_path}",
+			"cmd": ["mix", "compile"]
+		},
+
+		{
+			"name": "Mix: Clean",
+			"working_dir": "${project_path}",
+			"cmd": ["mix", "clean"]
+		},
+
+		{
+			"name": "Mix: Refresh Dependencies",
+			"working_dir": "${project_path}",
+			"cmd": ["mix", "do",
+			  "deps.clean", "--unused,",
+			  "deps.unlock", "--unused,",
+				"deps.update", "--all,",
+				"deps.compile"
+			]
+		},
+
+		{
+			"name": "Mix: Refresh Dependencies (Hard)",
+			"working_dir": "${project_path}",
+			"cmd": ["mix", "do",
+			  "deps.clean", "--all,",
+			  "deps.unlock", "--all,",
+				"deps.get,",
+				"deps.compile"
+			]
+		}
+	]
+}
