@@ -27,3 +27,18 @@ defimpl Bounds.Sliced, for: Bounds.SlicedBinary do
   def value(%SlicedBinary{} = sliced_value), do:
     SlicedBinary.to_binary(sliced_value)
 end
+
+defimpl Inspect, for: Bounds.SlicedBinary do
+  import Inspect.Algebra
+  alias Bounds.SlicedBinary
+
+  def inspect(%SlicedBinary{} = slice, opts) do
+    bin = SlicedBinary.to_binary(slice)
+
+    concat([
+      color("|", :binary, opts),
+      to_doc(bin, opts),
+      color("|", :binary, opts)
+    ])
+  end
+end

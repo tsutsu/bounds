@@ -39,6 +39,21 @@ defimpl Bounds.Sliced, for: Bounds.SlicedEnumerable do
     SlicedEnumerable.to_list(sliced_value)
 end
 
+defimpl Inspect, for: Bounds.SlicedEnumerable do
+  import Inspect.Algebra
+  alias Bounds.SlicedEnumerable
+
+  def inspect(%SlicedEnumerable{} = slice, opts) do
+    list = SlicedEnumerable.to_list(slice)
+
+    concat([
+      color("|", :binary, opts),
+      to_doc(list, opts),
+      color("|", :binary, opts)
+    ])
+  end
+end
+
 defimpl Enumerable, for: Bounds.SlicedEnumerable do
   alias Bounds.SlicedEnumerable
 
