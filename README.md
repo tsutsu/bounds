@@ -12,7 +12,7 @@ in `mix.exs`:
 
 ```elixir
 @deps [
-  bounds: "~> 0.1.10"
+  bounds: "~> 0.1.11"
 ]
 end
 ```
