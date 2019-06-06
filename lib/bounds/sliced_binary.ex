@@ -6,11 +6,15 @@ defmodule Bounds.SlicedBinary do
 
   @doc false
   def base(bin) when is_binary(bin) do
-    %__MODULE__{bin: bin, bounds: %Bounds{lower: 0, upper: byte_size(bin)}}
+    %__MODULE__{bin: bin, bounds: %Bounds{upper: byte_size(bin)}}
   end
 
   def slice(%__MODULE__{bin: bin, bounds: bounds}, slicing_bounds) do
     %__MODULE__{bin: bin, bounds: Bounds.slice(bounds, slicing_bounds)}
+  end
+
+  def unslice(%__MODULE__{bin: bin} = slice) do
+    %__MODULE__{slice | bounds: %Bounds{upper: byte_size(bin)}}
   end
 
   def to_binary(%__MODULE__{bin: bin, bounds: %Bounds{lower: lower, upper: upper}}) do
@@ -21,8 +25,14 @@ end
 defimpl Bounds.Sliced, for: Bounds.SlicedBinary do
   alias Bounds.SlicedBinary
 
+  def bounds(%SlicedBinary{bounds: bounds}), do:
+    bounds
+
   def slice(%SlicedBinary{} = sliced_value, slicing_bounds), do:
     SlicedBinary.slice(sliced_value, slicing_bounds)
+
+  def unslice(%SlicedBinary{} = sliced_value), do:
+    SlicedBinary.unslice(sliced_value)
 
   def value(%SlicedBinary{} = sliced_value), do:
     SlicedBinary.to_binary(sliced_value)
@@ -31,8 +41,14 @@ end
 defimpl Bounds.Sliced, for: BitString do
   alias Bounds.SlicedBinary
 
+  def bounds(bin), do:
+    %Bounds{upper: byte_size(bin)}
+
   def slice(bin, slicing_bounds) when is_binary(bin), do:
     SlicedBinary.slice(SlicedBinary.base(bin), slicing_bounds)
+
+  def unslice(bin) when is_binary(bin), do:
+    SlicedBinary.base(bin)
 
   def value(bin) when is_binary(bin), do:
     bin

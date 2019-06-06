@@ -1,12 +1,13 @@
 defmodule Bounds.SlicedEnumerable do
   defstruct [
     enum: [],
+    initial_size: 0,
     bounds: %Bounds{}
   ]
 
   @doc false
   def base(enum, size \\ nil) do
-    enum_size = case {Enumerable.slice(enum), size} do
+    enum_initial_size = case {Enumerable.slice(enum), size} do
       {{:ok, count_from_enum, _}, _} ->
         count_from_enum
       {{:error, _}, nil} ->
@@ -17,11 +18,15 @@ defmodule Bounds.SlicedEnumerable do
         explicit_size
     end
 
-    %__MODULE__{enum: enum, bounds: %Bounds{upper: enum_size}}
+    %__MODULE__{enum: enum, initial_size: enum_initial_size, bounds: %Bounds{upper: enum_initial_size}}
   end
 
-  def slice(%__MODULE__{enum: enum, bounds: bounds}, slicing_bounds) do
-    %__MODULE__{enum: enum, bounds: Bounds.slice(bounds, slicing_bounds)}
+  def slice(%__MODULE__{bounds: bounds} = slice, slicing_bounds) do
+    %__MODULE__{slice | bounds: Bounds.slice(bounds, slicing_bounds)}
+  end
+
+  def unslice(%__MODULE__{initial_size: enum_initial_size} = slice) do
+    %__MODULE__{slice | bounds: %Bounds{upper: enum_initial_size}}
   end
 
   def to_list(%__MODULE__{enum: enum, bounds: %Bounds{lower: lower, upper: upper}}) do
@@ -32,8 +37,14 @@ end
 defimpl Bounds.Sliced, for: Bounds.SlicedEnumerable do
   alias Bounds.SlicedEnumerable
 
+  def bounds(%SlicedEnumerable{bounds: bounds}), do:
+    bounds
+
   def slice(%SlicedEnumerable{} = sliced_value, slicing_bounds), do:
     SlicedEnumerable.slice(sliced_value, slicing_bounds)
+
+  def unslice(%SlicedEnumerable{} = sliced_value), do:
+    SlicedEnumerable.unslice(sliced_value)
 
   def value(%SlicedEnumerable{} = sliced_value), do:
     SlicedEnumerable.to_list(sliced_value)
@@ -42,8 +53,14 @@ end
 defimpl Bounds.Sliced, for: List do
   alias Bounds.SlicedEnumerable
 
+  def bounds(l) when is_list(l), do:
+    %Bounds{upper: length(l)}
+
   def slice(l, slicing_bounds) when is_list(l), do:
     SlicedEnumerable.slice(SlicedEnumerable.base(l, length(l)), slicing_bounds)
+
+  def unslice(l) when is_list(l), do:
+    SlicedEnumerable.base(l, length(l))
 
   def value(l) when is_list(l), do:
     l
@@ -52,11 +69,33 @@ end
 defimpl Bounds.Sliced, for: Stream do
   alias Bounds.SlicedEnumerable
 
+  def bounds(%Stream{}), do:
+    %Bounds{upper: :infinity}
+
   def slice(%Stream{} = s, slicing_bounds), do:
-    SlicedEnumerable.slice(SlicedEnumerable.base(s), slicing_bounds)
+    SlicedEnumerable.slice(SlicedEnumerable.base(s, :infinity), slicing_bounds)
+
+  def unslice(%Stream{} = s), do:
+    SlicedEnumerable.base(s, :infinity)
 
   def value(%Stream{} = s), do:
     Enum.to_list(s)
+end
+
+defimpl Bounds.Sliced, for: Range do
+  alias Bounds.SlicedEnumerable
+
+  def bounds(%Range{} = r), do:
+    %Bounds{upper: Enum.count(r)}
+
+  def slice(%Range{} = r, slicing_bounds), do:
+    SlicedEnumerable.slice(SlicedEnumerable.base(r), slicing_bounds)
+
+  def unslice(%Range{} = r), do:
+    SlicedEnumerable.base(r)
+
+  def value(%Range{} = r), do:
+    Enum.to_list(r)
 end
 
 defimpl Inspect, for: Bounds.SlicedEnumerable do
