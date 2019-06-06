@@ -39,6 +39,26 @@ defimpl Bounds.Sliced, for: Bounds.SlicedEnumerable do
     SlicedEnumerable.to_list(sliced_value)
 end
 
+defimpl Bounds.Sliced, for: List do
+  alias Bounds.SlicedEnumerable
+
+  def slice(l, slicing_bounds) when is_list(l), do:
+    SlicedEnumerable.slice(SlicedEnumerable.base(l, length(l)), slicing_bounds)
+
+  def value(l) when is_list(l), do:
+    l
+end
+
+defimpl Bounds.Sliced, for: Stream do
+  alias Bounds.SlicedEnumerable
+
+  def slice(%Stream{} = s, slicing_bounds), do:
+    SlicedEnumerable.slice(SlicedEnumerable.base(s), slicing_bounds)
+
+  def value(%Stream{} = s), do:
+    Enum.to_list(s)
+end
+
 defimpl Inspect, for: Bounds.SlicedEnumerable do
   import Inspect.Algebra
   alias Bounds.SlicedEnumerable

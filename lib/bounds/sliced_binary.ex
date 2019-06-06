@@ -28,6 +28,16 @@ defimpl Bounds.Sliced, for: Bounds.SlicedBinary do
     SlicedBinary.to_binary(sliced_value)
 end
 
+defimpl Bounds.Sliced, for: BitString do
+  alias Bounds.SlicedBinary
+
+  def slice(bin, slicing_bounds) when is_binary(bin), do:
+    SlicedBinary.slice(SlicedBinary.base(bin), slicing_bounds)
+
+  def value(bin) when is_binary(bin), do:
+    bin
+end
+
 defimpl Inspect, for: Bounds.SlicedBinary do
   import Inspect.Algebra
   alias Bounds.SlicedBinary
