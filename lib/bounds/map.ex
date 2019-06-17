@@ -64,7 +64,7 @@ defmodule Bounds.Map do
 
   def fetch(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
     result =
-      all_overlapping(tnode, interval(lower: loc, upper: loc + 1), [])
+      overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
       |> newest_interval()
 
     case result do
@@ -87,14 +87,24 @@ defmodule Bounds.Map do
     end
   end
 
+  def all_overlapping(%__MODULE__{} = bmap, loc) when is_integer(loc), do:
+    all_overlapping(bmap, Bounds.new(loc, 1))
+  def all_overlapping(%__MODULE__{} = bmap, {pos, len}), do:
+    all_overlapping(bmap, Bounds.new(pos, len))
+  def all_overlapping(%__MODULE__{root: tnode}, %Bounds{lower: lower, upper: upper}) do
+    overlapping_intervals(tnode, interval(lower: lower, upper: upper), [])
+    |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
+    |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
+  end
+
   def all_at(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
-    all_overlapping(tnode, interval(lower: loc, upper: loc + 1), [])
+    overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
     |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
     |> Enum.map(fn interval(value: v) -> v end)
   end
 
   def versions_at(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
-    all_overlapping(tnode, interval(lower: loc, upper: loc + 1), [])
+    overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
     |> Enum.sort_by(fn interval(priority: p, value: v) -> {p, v} end)
     |> Enum.map(fn interval(priority: p, value: v) -> {p, v} end)
   end
@@ -119,9 +129,9 @@ defmodule Bounds.Map do
     edges(dest, acc)
   end
 
-
-  def all_overlapping(%__MODULE__{root: tnode}, %Bounds{lower: lower, upper: upper}), do:
-    all_overlapping(tnode, interval(lower: lower, upper: upper), [])
+  @doc false
+  def overlapping_intervals(%__MODULE__{root: tnode}, %Bounds{lower: lower, upper: upper}), do:
+    overlapping_intervals(tnode, interval(lower: lower, upper: upper), [])
 
   def insert(%__MODULE__{root: tnode0, size: size0}, {%Bounds{lower: lower, upper: upper}, value}) do
     tnode1 = root_after_insert(tnode0, interval(lower: lower, upper: upper, priority: size0, value: value))
@@ -168,8 +178,8 @@ defmodule Bounds.Map do
   end
 
 
-  defp all_overlapping(nil, _, acc), do: acc
-  defp all_overlapping(tree_node(data: interval(lower: t1_l, upper: t1_u) = ival, left: left, right: right), interval(lower: t2_l, upper: t2_u) = t2, acc) do
+  defp overlapping_intervals(nil, _, acc), do: acc
+  defp overlapping_intervals(tree_node(data: interval(lower: t1_l, upper: t1_u) = ival, left: left, right: right), interval(lower: t2_l, upper: t2_u) = t2, acc) do
     overlap1 = t1_l < t2_u
     overlap2 = t2_l < t1_u
 
@@ -181,14 +191,14 @@ defmodule Bounds.Map do
 
     acc = case left do
       tree_node(max: left_max) when left_max > t2_l ->
-        all_overlapping(left, t2, acc)
+        overlapping_intervals(left, t2, acc)
       _ ->
         acc
     end
 
     acc = case {overlap1, right} do
       {true, tree_node(max: right_max)} when right_max > t2_l ->
-        all_overlapping(right, t2, acc)
+        overlapping_intervals(right, t2, acc)
       _ ->
         acc
     end
@@ -307,8 +317,11 @@ defimpl Enumerable, for: Bounds.Map do
   end
 
   def member?(%BMap{} = bmap, {%Bounds{} = bounds, _} = pair) do
-    BMap.all_overlapping(bmap, bounds)
-    |> Enum.member?(pair)
+    result =
+      BMap.overlapping_intervals(bmap, bounds)
+      |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
+      |> Enum.member?(pair)
+    {:ok, result}
   end
   def member?(%BMap{}, _), do: {:ok, false}
 
