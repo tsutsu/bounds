@@ -97,6 +97,20 @@ defmodule Bounds.Map do
     |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
   end
 
+  def all_within(%__MODULE__{} = bmap, loc) when is_integer(loc), do:
+    all_within(bmap, Bounds.new(loc, 1))
+  def all_within(%__MODULE__{} = bmap, {pos, len}), do:
+    all_within(bmap, Bounds.new(pos, len))
+  def all_within(%__MODULE__{root: tnode}, %Bounds{lower: lower, upper: upper}) do
+    overlapping_intervals(tnode, interval(lower: lower, upper: upper), [])
+    |> Enum.filter(fn
+      interval(lower: ival_lower, upper: ival_upper) when ival_lower >= lower and ival_upper <= upper -> true
+      _ -> false
+    end)
+    |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
+    |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
+  end
+
   def all_at(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
     overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
     |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
