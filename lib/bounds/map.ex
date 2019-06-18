@@ -111,6 +111,40 @@ defmodule Bounds.Map do
     |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
   end
 
+  def outermost_within(%__MODULE__{root: tnode} = bmap, search_bounds \\ nil, opts \\ []) do
+    {%Bounds{lower: lower, upper: upper}, opts} = case {search_bounds, opts} do
+      {l, []} when is_list(l) -> {extent(bmap), l}
+      {nil, l} -> {extent(bmap), l}
+      {b, l} -> {b, l}
+    end
+
+    accept_matching? = not(Keyword.get(opts, :ignore_matching, false))
+
+    overlapping_intervals(tnode, interval(lower: lower, upper: upper), [])
+    |> Stream.filter(fn
+      interval(lower: ^lower, upper: ^upper) -> accept_matching?
+      interval(lower: ival_lower, upper: ival_upper) when ival_lower >= lower and ival_upper <= upper -> true
+      _ -> false
+    end)
+    |> Enum.sort_by(fn interval(lower: lower, upper: upper) -> {lower, -upper} end)
+    |> Enum.reduce(%__MODULE__{}, fn interval(lower: taking_lower, upper: taking_upper, value: taking_value) = taking_ival, %__MODULE__{root: collected_root0, size: collected_size0} = collected0 ->
+      covered? =
+        overlapping_intervals(collected_root0, taking_ival, [])
+        |> Enum.any?(fn
+          interval(lower: covering_lower, upper: covering_upper) when taking_lower >= covering_lower and taking_upper <= covering_upper -> true
+          _ -> false
+        end)
+
+      case covered? do
+        true -> collected0
+        false ->
+          collected_root1 = root_after_insert(collected_root0, interval(lower: taking_lower, upper: taking_upper, priority: collected_size0, value: taking_value))
+          %__MODULE__{root: collected_root1, size: collected_size0 + 1}
+      end
+    end)
+    |> Enum.to_list()
+  end
+
   def all_at(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
     overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
     |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
