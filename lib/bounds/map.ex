@@ -152,6 +152,12 @@ defmodule Bounds.Map do
     %__MODULE__{root: tnode1, size: size0 + 1}
   end
 
+  def extent(%__MODULE__{root: tnode}) do
+    interval(lower: min_lower) = min_ival(tnode)
+    interval(upper: max_upper) = max_ival(tnode)
+    %Bounds{lower: min_lower, upper: max_upper}
+  end
+
 
   defmacrop updated_tree_node(tnode0, args) do
     quote do
@@ -191,6 +197,20 @@ defmodule Bounds.Map do
     acc
   end
 
+  defp min_ival(nil), do: interval(lower: 0, upper: 0)
+  defp min_ival(tree_node(data: ival, left: nil)), do: ival
+  defp min_ival(tree_node(left: left)), do: min_ival(left)
+
+  defp max_ival(nil), do: interval(lower: 0, upper: 0)
+  defp max_ival(interval() = ival), do: ival
+  defp max_ival(tree_node(data: center, left: left, right: right)) do
+    Enum.max_by([center, left, right], fn
+      interval(upper: u) -> u
+      tree_node(max: m) -> m
+      nil -> 0
+    end)
+    |> max_ival()
+  end
 
   defp overlapping_intervals(nil, _, acc), do: acc
   defp overlapping_intervals(tree_node(data: interval(lower: t1_l, upper: t1_u) = ival, left: left, right: right), interval(lower: t2_l, upper: t2_u) = t2, acc) do
