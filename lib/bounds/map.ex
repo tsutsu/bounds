@@ -367,6 +367,8 @@ defimpl Enumerable, for: Bounds.Map do
     {:halted, acc}
   defp reduce_impl(work, {:suspend, acc}, fun), do:
     {:suspended, acc, &reduce_impl(work, &1, fun)}
+  defp reduce_impl([nil], {:cont, acc}, _fun), do:
+    {:done, acc}
   defp reduce_impl([], {:cont, acc}, _fun), do:
     {:done, acc}
   defp reduce_impl([tree_node(data: ival, left: left, right: right) | work], {:cont, acc}, fun) do
