@@ -103,6 +103,14 @@ defmodule Bounds.Map.Impl do
   end
 
 
+  def covered_by(tnode, interval(lower: q_lower, upper: q_upper) = ival) do
+    overlaps(tnode, ival, [])
+    |> Enum.filter(fn
+      interval(lower: match_lower, upper: match_upper) when q_lower >= match_lower and q_upper <= match_upper -> true
+      _ -> false
+    end)
+  end
+
   def vertices(tnode) do
     vertices_visit_vertex(tnode, [])
   end
