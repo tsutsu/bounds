@@ -1,362 +1,159 @@
-defmodule Bounds.Map.Records do
-  require Record
-  import Record
-
-  defrecord :interval, [
-    lower: -1,
-    upper: -1,
-    priority: -1,
-    value: nil
-  ]
-
-  defrecord :tree_node, [
-    max: -1,
-    height: -1,
-    data: nil,
-    left: nil,
-    right: nil
-  ]
-end
-
 defmodule Bounds.Map do
   import Bounds.Map.Records
+  alias Bounds.Map.Impl
 
   defstruct [
     size: 0,
+    priority_seq: 0,
     root: nil
   ]
 
   def new, do: %__MODULE__{}
 
 
-  # Map-like interface
+  @doc false
+  def insert(%__MODULE__{root: tnode0, size: size0}, interval() = ival) do
+    {tnode1, size1} = Impl.insert({tnode0, size0}, ival)
+    %__MODULE__{root: tnode1, size: size1}
+  end
 
-  def put(%__MODULE__{} = map, bounds, value), do:
-    insert(map, {bounds, value})
+  def insert(%__MODULE__{root: tnode0, priority_seq: pseq0, size: size0}, boundable, value) do
+    priority = [:"$p" | pseq0]
+    {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
+    {tnode1, size1} = Impl.insert({tnode0, size0}, interval(lower: lower, upper: upper, priority: priority, value: value))
+    %__MODULE__{root: tnode1, priority_seq: pseq0 + 1, size: size1}
+  end
 
-  def delete(%__MODULE__{root: tnode0, size: size0} = map, %Bounds{lower: lower, upper: upper}) do
-    result =
-      exact_matches(tnode0, interval(lower: lower, upper: upper), [])
-      |> newest_interval()
+  def insert(%__MODULE__{root: tnode0, size: size0}, boundable, priority, value) do
+    {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
+    {tnode1, size1} = Impl.insert({tnode0, size0}, interval(lower: lower, upper: upper, priority: priority, value: value))
+    %__MODULE__{root: tnode1, size: size1}
+  end
 
-    case result do
-      {:ok, interval() = ival} ->
-        case root_after_delete(tnode0, ival) do
-          {:changed, tnode1} ->
-            %__MODULE__{root: tnode1, size: size0 - 1}
-          :same ->
-            map
-        end
-      :error ->
-        map
+
+  def all(%__MODULE__{} = bmap, boundable, selector_name \\ :coincidents), do:
+    do_match(bmap, {selector_name, boundable}, :all, :triples)
+
+  def highest(%__MODULE__{} = bmap, boundable, selector_name \\ :coincidents), do:
+    do_match(bmap, {selector_name, boundable}, :highest, :triples)
+
+  def layer(%__MODULE__{} = bmap, z), do:
+    do_match(bmap, :all, {:priority, z}, :map)
+
+  def filter(%__MODULE__{} = bmap, pred), do:
+    do_match(bmap, :all, {:predicate, pred}, :map)
+
+
+  def delete_all(%__MODULE__{} = bmap, boundable, selector_name \\ :coincidents), do:
+    do_match(bmap, {selector_name, boundable}, :all, :delete)
+
+  def delete_highest(%__MODULE__{} = bmap, boundable, selector_name \\ :coincidents), do:
+    do_match(bmap, {selector_name, boundable}, :highest, :delete)
+
+  def delete_layer(%__MODULE__{} = bmap, z), do:
+    do_match(bmap, :all, {:priority, z}, :delete)
+
+
+  def keys(%__MODULE__{root: tnode}, opts \\ []) do
+    v_stream = Impl.stream_vertices(tnode)
+
+    if Keyword.get(opts, :with_priorities, true) do
+      Stream.map(v_stream, fn interval(lower: lower, upper: upper, priority: priority) ->
+        {%Bounds{lower: lower, upper: upper}, priority}
+      end)
+    else
+      Stream.map(v_stream, fn interval(lower: lower, upper: upper) ->
+        %Bounds{lower: lower, upper: upper}
+      end)
     end
   end
 
-  def keys(%__MODULE__{} = map) do
-    Enum.reduce(map, [], fn {k, _}, acc -> [k | acc] end)
-    |> Enum.reverse()
+
+  def values(%__MODULE__{root: tnode}) do
+    Impl.stream_vertices(tnode)
+    |> Stream.map(fn interval(value: value) -> value end)
   end
 
-  def values(%__MODULE__{} = map) do
-    Enum.reduce(map, [], fn {_, v}, acc -> [v | acc] end)
-    |> Enum.reverse()
+
+  def triples(%__MODULE__{root: tnode}) do
+    Impl.stream_vertices(tnode)
+    |> Stream.map(fn interval(lower: lower, upper: upper, priority: priority, value: value) ->
+      {%Bounds{lower: lower, upper: upper}, priority, value}
+    end)
   end
 
-  def fetch(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
-    result =
-      overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
-      |> newest_interval()
 
-    case result do
-      {:ok, interval(value: v)} -> {:ok, v}
-      :error -> :error
-    end
-  end
-
-  def get(%__MODULE__{} = map, loc, default \\ nil) when is_integer(loc) do
-    case fetch(map, loc) do
-      {:ok, v} -> v
-      :error -> default
-    end
-  end
-
-  def fetch!(%__MODULE__{} = map, loc) when is_integer(loc) do
-    case fetch(map, loc) do
-      {:ok, v} -> v
-      :error -> raise KeyError, key: loc, term: map
-    end
-  end
-
-  def all_overlapping(%__MODULE__{} = bmap, loc) when is_integer(loc), do:
-    all_overlapping(bmap, Bounds.new(loc, 1))
-  def all_overlapping(%__MODULE__{} = bmap, {pos, len}), do:
-    all_overlapping(bmap, Bounds.new(pos, len))
-  def all_overlapping(%__MODULE__{root: tnode}, %Bounds{lower: lower, upper: upper}) do
-    overlapping_intervals(tnode, interval(lower: lower, upper: upper), [])
-    |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
-    |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
-  end
-
-  def all_within(%__MODULE__{} = bmap, loc) when is_integer(loc), do:
-    all_within(bmap, Bounds.new(loc, 1))
-  def all_within(%__MODULE__{} = bmap, {pos, len}), do:
-    all_within(bmap, Bounds.new(pos, len))
-  def all_within(%__MODULE__{root: tnode}, %Bounds{lower: lower, upper: upper}) do
-    overlapping_intervals(tnode, interval(lower: lower, upper: upper), [])
-    |> Enum.filter(fn
-      interval(lower: ival_lower, upper: ival_upper) when ival_lower >= lower and ival_upper <= upper -> true
+  def member?(%__MODULE__{root: tnode}, {%Bounds{lower: lower, upper: upper}, priority, value}) do
+    Impl.coincidents(tnode, interval(lower: lower, upper: upper))
+    |> Enum.any?(fn
+      interval(priority: ^priority, value: ^value) -> true
       _ -> false
     end)
-    |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
-    |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
+  end
+  def member?(%__MODULE__{}, _), do: false
+
+
+
+  ## helpers
+
+  def do_match(%__MODULE__{} = bmap, select_part, filter_part, return_part) do
+    matching_ivals = do_match_select(select_part, bmap)
+    filtered_ivals = do_match_filter(filter_part, matching_ivals)
+    do_match_reduce(return_part, filtered_ivals, bmap)
   end
 
-  def all_at(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
-    overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
-    |> Enum.sort_by(fn interval(priority: p, value: v) -> {-p, v} end)
-    |> Enum.map(fn interval(value: v) -> v end)
+  defp do_match_select(:all, %__MODULE__{root: tnode}), do:
+    Impl.stream_vertices(tnode)
+  defp do_match_select({selector_name, boundable}, %__MODULE__{root: tnode}) do
+    {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
+    query_ival = interval(lower: lower, upper: upper)
+    do_match_select2(selector_name, tnode, query_ival)
   end
 
-  def versions_at(%__MODULE__{root: tnode}, loc) when is_integer(loc) do
-    overlapping_intervals(tnode, interval(lower: loc, upper: loc + 1), [])
-    |> Enum.sort_by(fn interval(priority: p, value: v) -> {p, v} end)
-    |> Enum.map(fn interval(priority: p, value: v) -> {p, v} end)
+  defp do_match_select2(:coincidents, tnode, select_ival), do:
+    Impl.coincidents(tnode, select_ival)
+  defp do_match_select2(:overlaps, tnode, select_ival), do:
+    Impl.overlaps(tnode, select_ival)
+  defp do_match_select2(:covers, tnode, select_ival), do:
+    Impl.covers(tnode, select_ival)
+
+  defp do_match_filter(:all, result_set), do:
+    Impl.all_priorities(result_set)
+  defp do_match_filter({:priority, n}, result_set), do:
+    Impl.with_priority(result_set, n)
+  defp do_match_filter(:highest, result_set), do:
+    Impl.highest_priority(result_set)
+  defp do_match_filter({:predicate, pred}, result_set), do:
+    Enum.filter(result_set, pred)
+
+  defp do_match_reduce(:triples, result_set, _orig_bmap) do
+    Enum.map(result_set, fn interval(lower: lower, upper: upper, priority: priority, value: value) ->
+      {%Bounds{lower: lower, upper: upper}, priority, value}
+    end)
   end
-
-  def edges(%__MODULE__{root: tnode}) do
-    edges(tnode, [])
-    |> Enum.reverse()
+  defp do_match_reduce(:map, result_set, _orig_bmap), do:
+    Enum.into(result_set, new())
+  defp do_match_reduce(:delete, [], orig_bmap), do:
+    orig_bmap
+  defp do_match_reduce(:delete, result_set, %__MODULE__{root: tnode0, size: size0} = orig_bmap) do
+    {tnode1, size1} = Impl.delete_matches({tnode0, size0}, result_set)
+    %__MODULE__{orig_bmap | root: tnode1, size: size1}
   end
-
-  defp edges(nil, acc), do: acc
-  defp edges(tree_node(data: interval(lower: lower, upper: upper, priority: p), left: left, right: right), acc) do
-    src_vertex = {%Bounds{lower: lower, upper: upper}, p}
-    acc = edge(src_vertex, left, acc)
-    acc = edge(src_vertex, right, acc)
-    acc
-  end
-
-  defp edge(_src_vertex, nil, acc), do: acc
-  defp edge(src_vertex, tree_node(data: interval(lower: lower, upper: upper, priority: p)) = dest, acc) do
-    dest_vertex = {%Bounds{lower: lower, upper: upper}, p}
-    acc = [{src_vertex, dest_vertex} | acc]
-    edges(dest, acc)
-  end
-
-  @doc false
-  def overlapping_intervals(%__MODULE__{root: tnode}, %Bounds{lower: lower, upper: upper}), do:
-    overlapping_intervals(tnode, interval(lower: lower, upper: upper), [])
-
-  def insert(%__MODULE__{root: tnode0, size: size0}, {%Bounds{lower: lower, upper: upper}, value}) do
-    tnode1 = root_after_insert(tnode0, interval(lower: lower, upper: upper, priority: size0, value: value))
-    %__MODULE__{root: tnode1, size: size0 + 1}
-  end
-
-
-  defmacrop updated_tree_node(tnode0, args) do
-    quote do
-      update_max(tree_node(unquote(tnode0), unquote(args)))
-    end
-  end
-
-  defp newest_interval([]), do: :error
-  defp newest_interval(l) when is_list(l) do
-    newest = Enum.min_by(l, fn interval(priority: p, value: v) -> {-p, v} end)
-    {:ok, newest}
-  end
-
-
-  defp exact_matches(nil, _ival, acc), do: acc
-  defp exact_matches(tree_node(data: interval(lower: t1_l, upper: t1_u) = ival, left: left, right: right), interval(lower: t2_l, upper: t2_u) = t2, acc) do
-    acc = if t1_l == t2_l and t1_u == t2_u do
-      [ival | acc]
-    else
-      acc
-    end
-
-    acc = case left do
-      tree_node(max: left_max) when left_max > t2_l ->
-        exact_matches(left, t2, acc)
-      _ ->
-        acc
-    end
-
-    acc = case {t1_l < t2_u, right} do
-      {true, tree_node(max: right_max)} when right_max > t2_l ->
-        exact_matches(right, t2, acc)
-      _ ->
-        acc
-    end
-
-    acc
-  end
-
-
-  defp overlapping_intervals(nil, _, acc), do: acc
-  defp overlapping_intervals(tree_node(data: interval(lower: t1_l, upper: t1_u) = ival, left: left, right: right), interval(lower: t2_l, upper: t2_u) = t2, acc) do
-    overlap1 = t1_l < t2_u
-    overlap2 = t2_l < t1_u
-
-    acc = if overlap1 and overlap2 do
-      [ival | acc]
-    else
-      acc
-    end
-
-    acc = case left do
-      tree_node(max: left_max) when left_max > t2_l ->
-        overlapping_intervals(left, t2, acc)
-      _ ->
-        acc
-    end
-
-    acc = case {overlap1, right} do
-      {true, tree_node(max: right_max)} when right_max > t2_l ->
-        overlapping_intervals(right, t2, acc)
-      _ ->
-        acc
-    end
-
-    acc
-  end
-
-  @doc false
-  def root_after_insert(nil, interval(upper: upper) = ival) do
-    tree_node(data: ival, max: upper, height: 1)
-  end
-
-  def root_after_insert(tree_node(data: interval(lower: data_lower), left: left0, right: right0) = tnode0, interval(lower: ival_lower) = ival) do
-    tnode1 = if ival_lower < data_lower do
-      left1 = root_after_insert(left0, ival)
-      updated_tree_node(tnode0, left: left1, height: get_height(left1, right0))
-    else
-      right1 = root_after_insert(right0, ival)
-      updated_tree_node(tnode0, right: right1, height: get_height(left0, right1))
-    end
-
-    balance(tnode1, ival_lower)
-  end
-
-  @doc false
-  def root_after_delete(nil, _), do: :same
-  def root_after_delete(tree_node(data: ival, left: nil, right: nil) = n, ival) do
-    IO.inspect(n, label: "deleting leaf")
-    {:changed, nil}
-  end
-  def root_after_delete(tree_node(data: ival, left: tree_node() = left0, right: nil) = n, ival) do
-    IO.inspect(n, label: "deleting lbranch")
-    {:changed, left0}
-  end
-  def root_after_delete(tree_node(data: ival, left: nil, right: tree_node() = right0) = n, ival) do
-    IO.inspect(n, label: "deleting rbranch")
-    {:changed, right0}
-  end
-  def root_after_delete(tree_node(data: ival, left: tree_node() = _left0, right: tree_node() = _right0), ival), do:
-    raise ArgumentError, "not implemented"
-  def root_after_delete(tree_node(left: left0, right: right0) = tnode0, ival) do
-    case root_after_delete(left0, ival) do
-      {:changed, left1} ->
-        {:changed, updated_tree_node(tnode0, left: left1, height: get_height(left1, right0))}
-      :same ->
-        case root_after_delete(right0, ival) do
-          {:changed, right1} ->
-            {:changed, updated_tree_node(tnode0, right: right1, height: get_height(left0, right1))}
-          :same ->
-            :same
-        end
-    end
-  end
-
-  defp balance(nil, _low_key), do: nil
-  defp balance(tree_node(left: left, right: right) = tnode0, low_key) when is_integer(low_key) do
-    case get_height(left) - get_height(right) do
-      delta when delta > 1 ->
-        maybe_rotate(:right, tnode0, left, low_key)
-      delta when delta < -1 ->
-        maybe_rotate(:left, tnode0, right, low_key)
-      _ ->
-        tnode0
-    end
-  end
-
-  defp maybe_rotate(_, tnode0, nil, _), do: tnode0
-  defp maybe_rotate(:right, tnode0, tree_node(data: interval(lower: left_lower)) = left, low_key) do
-    tnode1 = case low_key < left_lower do
-      true -> tnode0
-      false -> tree_node(tnode0, left: rotate_left(left))
-    end
-    rotate_right(tnode1)
-  end
-  defp maybe_rotate(:left, tnode0, tree_node(data: interval(lower: right_lower)) = right, low_key) do
-    tnode1 = case low_key < right_lower do
-      true -> tree_node(tnode0, right: rotate_right(right))
-      false -> tnode0
-    end
-    rotate_left(tnode1)
-  end
-
-  defp rotate_right(tree_node(left: tree_node(left: ll0, right: lr0) = l0, right: r0) = tnode0) do
-    tnode1 = updated_tree_node(tnode0, left: lr0, height: get_height(lr0, r0))
-    updated_tree_node(l0, right: tnode1, height: get_height(ll0, tnode1))
-  end
-
-  defp rotate_left(tree_node(left: l0, right: tree_node(left: rl0, right: rr0) = r0) = tnode0) do
-    tnode1 = updated_tree_node(tnode0, right: rl0, height: get_height(l0, rl0))
-    updated_tree_node(r0, left: tnode1, height: get_height(tnode1, rr0))
-  end
-
-  @compile inline: [get_max: 1, update_max: 1, get_height: 1, get_height: 2]
-
-  defp get_max(tree_node(max: max)), do: max
-  defp get_max(nil), do: 0
-
-  defp update_max(tree_node(data: interval(upper: data_upper), left: left, right: right) = tnode0) do
-    max = Kernel.max(Kernel.max(get_max(left), get_max(right)), data_upper)
-    tree_node(tnode0, max: max)
-  end
-
-  defp get_height(left, right), do:
-    Kernel.max(get_height(left), get_height(right)) + 1
-
-  defp get_height(tree_node(height: height)), do: height
-  defp get_height(nil), do: 0
 end
 
 defimpl Enumerable, for: Bounds.Map do
   alias Bounds.Map, as: BMap
-  import Bounds.Map.Records
 
   def count(%BMap{size: size}) do
     {:ok, size}
   end
 
-  def member?(%BMap{} = bmap, {%Bounds{} = bounds, _} = pair) do
-    result =
-      BMap.overlapping_intervals(bmap, bounds)
-      |> Enum.map(fn interval(lower: lower, upper: upper, value: v) -> {%Bounds{lower: lower, upper: upper}, v} end)
-      |> Enum.member?(pair)
-    {:ok, result}
-  end
-  def member?(%BMap{}, _), do: {:ok, false}
-
-  def reduce(%BMap{root: tnode}, acc, fun) do
-    reduce_impl([tnode], acc, fun)
+  def member?(%BMap{} = bmap, triple) do
+    {:ok, BMap.member?(bmap, triple)}
   end
 
-  defp reduce_impl(_work, {:halt, acc}, _fun), do:
-    {:halted, acc}
-  defp reduce_impl(work, {:suspend, acc}, fun), do:
-    {:suspended, acc, &reduce_impl(work, &1, fun)}
-  defp reduce_impl([], {:cont, acc}, _fun), do:
-    {:done, acc}
-  defp reduce_impl([tree_node(data: ival, left: left, right: right) | work], {:cont, acc}, fun) do
-    left_part = if left, do: [left], else: []
-    right_part = if right, do: [right], else: []
-    reduce_impl(left_part ++ [ival] ++ right_part ++ work, {:cont, acc}, fun)
-  end
-  defp reduce_impl([interval(lower: lower, upper: upper, value: value) | work], {:cont, acc}, fun) do
-    elem = {%Bounds{lower: lower, upper: upper}, value}
-    reduce_impl(work, fun.(elem, acc), fun)
+  def reduce(%BMap{} = bmap, acc, fun) do
+    Enumerable.reduce(BMap.triples(bmap), acc, fun)
   end
 
   def slice(%BMap{}) do
@@ -365,20 +162,21 @@ defimpl Enumerable, for: Bounds.Map do
 end
 
 defimpl Collectable, for: Bounds.Map do
-  import Bounds.Map.Records
+  alias Bounds.Map, as: BMap
 
-  def into(%Bounds.Map{root: tnode, size: size}), do:
-    {[tnode | size], &collector/2}
+  def into(%BMap{} = bmap), do:
+    {bmap, &collector/2}
 
   defp collector(acc, cmd)
-  defp collector([tnode | size], {:cont, {%Bounds{lower: lower, upper: upper}, value}}), do:
-    [Bounds.Map.root_after_insert(tnode, interval(lower: lower, upper: upper, priority: size, value: value)) | size + 1]
-  defp collector(_tnode_acc, {:cont, {other, _}}), do:
-    raise ArgumentError, "cannot cast #{inspect(other)} to Bounds"
-  defp collector(_tnode_acc, {:cont, other}), do:
-    raise ArgumentError, "#{inspect(other)} is not a key-value pair"
-  defp collector([tnode | size], :done), do:
-    %Bounds.Map{root: tnode, size: size}
+
+  defp collector(bmap, {:cont, {bounds, priority, value}}), do:
+    BMap.insert(bmap, bounds, priority, value)
+  defp collector(bmap, {:cont, {bounds, value}}), do:
+    BMap.insert(bmap, bounds, value)
+  defp collector(bmap, {:cont, ival}), do:
+    BMap.insert(bmap, ival)
+  defp collector(bmap, :done), do:
+    bmap
   defp collector(_acc, :halt), do:
     :ok
 end
