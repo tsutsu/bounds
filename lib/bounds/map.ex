@@ -125,7 +125,7 @@ defmodule Bounds.Map do
     Impl.covers(tnode, select_ival)
 
   defp do_match_filter(:all, result_set), do:
-    Impl.all_priorities(result_set)
+    result_set
   defp do_match_filter({:priority, n}, result_set), do:
     Impl.with_priority(result_set, n)
   defp do_match_filter(:highest, result_set), do:

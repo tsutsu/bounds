@@ -16,11 +16,6 @@ defmodule Bounds.Map.Impl do
     Map.fetch!(layers, max_z)
   end
 
-  def all_priorities([]), do: []
-  def all_priorities(l) when is_list(l) do
-    Enum.sort_by(l, fn interval(priority: p, value: v) -> {-p, v} end)
-  end
-
 
   def insert({tnode0, size0}, ival) do
     tnode1 = root_after_insert(tnode0, ival)
