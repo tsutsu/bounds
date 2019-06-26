@@ -76,10 +76,10 @@ defmodule Bounds do
 
 
   @doc "Casts a compatible value to a Bounds value."
-  def new(poslen_or_range)
-  def new({pos, len}), do: from_poslen({pos, len})
-  def new(%Range{} = r), do: from_range(r)
-  def new(%__MODULE__{} = bounds), do: bounds
+  def new(boundable) do
+    {bounds, _} = Coerce.coerce(boundable, %Bounds{})
+    bounds
+  end
 
 
   @doc "Converts a `{pos, len}` tuple to an equivalent Bounds value."
