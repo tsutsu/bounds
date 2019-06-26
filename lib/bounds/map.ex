@@ -134,6 +134,18 @@ defmodule Bounds.Map do
     Impl.highest_priority(result_set)
   defp do_match_filter({:predicate, pred}, result_set), do:
     Enum.filter(result_set, pred)
+  defp do_match_filter(:outermost, result_set) do
+    %__MODULE__{root: tnode} =
+      Enum.sort_by(result_set, fn interval(lower: lower, upper: upper) -> {lower, -upper} end)
+      |> Enum.reduce(%__MODULE__{}, fn ival, %__MODULE__{root: tnode} = bmap_acc ->
+        case Impl.covered_by(tnode, ival) do
+          [] -> insert(bmap_acc, ival)
+          _ -> bmap_acc
+        end
+      end)
+
+    Impl.stream_vertices(tnode)
+  end
 
   defp do_match_reduce(:triples, result_set, _orig_bmap) do
     Enum.map(result_set, fn interval(lower: lower, upper: upper, priority: priority, value: value) ->
