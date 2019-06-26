@@ -23,15 +23,15 @@ defmodule Bounds.Map.Impl do
   end
 
 
-  def delete_matches(tnode_and_size, []), do:
-    tnode_and_size
-  def delete_matches({tnode0, size0} = tnode_and_size, [ival | ivals]) do
-    case root_after_delete(tnode0, ival) do
-      {:changed, tnode1} ->
-        delete_matches({tnode1, size0 - 1}, ivals)
-      :same ->
-        delete_matches(tnode_and_size, ivals)
-    end
+  def delete_matches(tnode_and_size, ival_enum) do
+    Enum.reduce(ival_enum, tnode_and_size, fn ival, {tnode_acc0, size_acc0} ->
+      case root_after_delete(tnode_acc0, ival) do
+        {:changed, tnode_acc1} ->
+          {tnode_acc1, size_acc0 - 1}
+        :same ->
+          {tnode_acc0, size_acc0}
+      end
+    end)
   end
 
 
