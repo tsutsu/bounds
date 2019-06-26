@@ -123,6 +123,8 @@ defmodule Bounds.Map do
     Impl.overlaps(tnode, select_ival)
   defp do_match_select2(:covers, tnode, select_ival), do:
     Impl.covers(tnode, select_ival)
+  defp do_match_select2(:strict_subsets, tnode, select_ival), do:
+    Impl.covers(tnode, select_ival) -- Impl.coincidents(tnode, select_ival)
 
   defp do_match_filter(:all, result_set), do:
     result_set
