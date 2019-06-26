@@ -198,7 +198,7 @@ defmodule Bounds.Map.Impl do
     {:changed, right0}
   end
   defp root_after_delete(tree_node(data: ival, left: tree_node() = left0, right: tree_node() = right0) = tnode0, ival) do
-    min_ival = min_ival(right0)
+    right_min_ival = min_ival(right0)
     {:changed, right1} = root_after_delete(right0, right_min_ival)
     {:changed, updated_tree_node(tnode0, data: right_min_ival, right: right1, height: get_height(left0, right1))}
   end
