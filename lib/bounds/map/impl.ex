@@ -195,7 +195,7 @@ defmodule Bounds.Map.Impl do
     {:changed, right0}
   end
   defp root_after_delete(tree_node(data: ival, left: tree_node() = left0, right: tree_node() = right0) = tnode0, ival) do
-    tree_node(data: right_min_ival) = min_node(right0)
+    min_ival = min_ival(right0)
     {:changed, right1} = root_after_delete(right0, right_min_ival)
     {:changed, updated_tree_node(tnode0, data: right_min_ival, right: right1, height: get_height(left0, right1))}
   end
@@ -212,9 +212,6 @@ defmodule Bounds.Map.Impl do
         end
     end
   end
-
-  defp min_node(tree_node(left: nil) = tnode), do: tnode
-  defp min_node(tree_node(left: left)), do: min_node(left)
 
   defp balance(nil, _low_key), do: nil
   defp balance(tree_node(left: left, right: right) = tnode0, low_key) when is_integer(low_key) do
@@ -252,6 +249,21 @@ defmodule Bounds.Map.Impl do
   defp rotate_left(tree_node(left: l0, right: tree_node(left: rl0, right: rr0) = r0) = tnode0) do
     tnode1 = updated_tree_node(tnode0, right: rl0, height: get_height(l0, rl0))
     updated_tree_node(r0, left: tnode1, height: get_height(tnode1, rr0))
+  end
+
+  def min_ival(nil), do: interval(lower: 0, upper: 0)
+  def min_ival(tree_node(data: ival, left: nil)), do: ival
+  def min_ival(tree_node(left: left)), do: min_ival(left)
+
+  def max_ival(nil), do: interval(lower: 0, upper: 0)
+  def max_ival(interval() = ival), do: ival
+  def max_ival(tree_node(data: center, left: left, right: right)) do
+    Enum.max_by([center, left, right], fn
+      interval(upper: u) -> u
+      tree_node(max: m) -> m
+      nil -> 0
+    end)
+    |> max_ival()
   end
 
   @compile inline: [get_max: 1, update_max: 1, get_height: 1, get_height: 2]

@@ -93,6 +93,13 @@ defmodule Bounds.Map do
   def member?(%__MODULE__{}, _), do: false
 
 
+  def extent(%__MODULE__{root: tnode}) do
+    interval(lower: min_lower) = Impl.min_ival(tnode)
+    interval(upper: max_upper) = Impl.max_ival(tnode)
+    %Bounds{lower: min_lower, upper: max_upper}
+  end
+
+
 
   ## helpers
 
