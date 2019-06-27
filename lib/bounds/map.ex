@@ -5,6 +5,7 @@ defmodule Bounds.Map do
   defstruct [
     size: 0,
     priority_seq: 0,
+    offset: 0,
     root: nil
   ]
 
@@ -12,22 +13,22 @@ defmodule Bounds.Map do
 
 
   @doc false
-  def insert(%__MODULE__{root: tnode0, size: size0}, interval() = ival) do
+  def insert(%__MODULE__{root: tnode0, size: size0} = bset0, interval() = ival) do
     {tnode1, size1} = Impl.insert({tnode0, size0}, ival)
-    %__MODULE__{root: tnode1, size: size1}
+    %__MODULE__{bset0 | root: tnode1, size: size1}
   end
 
-  def insert(%__MODULE__{root: tnode0, priority_seq: pseq0, size: size0}, boundable, value) do
+  def insert(%__MODULE__{root: tnode0, priority_seq: pseq0, size: size0} = bset0, boundable, value) do
     priority = [:"$p" | pseq0]
     {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
     {tnode1, size1} = Impl.insert({tnode0, size0}, interval(lower: lower, upper: upper, priority: priority, value: value))
-    %__MODULE__{root: tnode1, priority_seq: pseq0 + 1, size: size1}
+    %__MODULE__{bset0 | root: tnode1, priority_seq: pseq0 + 1, size: size1}
   end
 
-  def insert(%__MODULE__{root: tnode0, size: size0}, boundable, priority, value) do
+  def insert(%__MODULE__{root: tnode0, size: size0} = bset0, boundable, priority, value) do
     {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
     {tnode1, size1} = Impl.insert({tnode0, size0}, interval(lower: lower, upper: upper, priority: priority, value: value))
-    %__MODULE__{root: tnode1, size: size1}
+    %__MODULE__{bset0 | root: tnode1, size: size1}
   end
 
 
@@ -100,13 +101,36 @@ defmodule Bounds.Map do
   end
 
 
-  def surface(%__MODULE__{root: tnode}) do
+  def slice(%__MODULE__{root: tnode0, offset: offset0}, interval(lower: mask_lower, upper: mask_upper) = mask_ival) do
+    Impl.overlaps(tnode0, mask_ival)
+    |> Stream.map(fn interval(lower: shape_lower, upper: shape_upper) = ival ->
+      slice_lower = :erlang.max(mask_lower, shape_lower) - mask_lower
+      slice_upper = :erlang.min(mask_upper, shape_upper) - mask_lower
+      interval(ival, lower: slice_lower, upper: slice_upper)
+    end)
+    |> Stream.filter(fn
+      interval(lower: common, upper: common) -> false
+      _ -> true
+    end)
+    |> Enum.into(%__MODULE__{offset: offset0 + mask_lower})
+  end
+  def slice(%__MODULE__{} = bmap, mask_boundable) do
+    {%Bounds{lower: mask_lower, upper: mask_upper}, _} = Coerce.coerce(mask_boundable, %Bounds{})
+    slice(bmap, interval(lower: mask_lower, upper: mask_upper))
+  end
+
+
+  def clear(%__MODULE__{} = bmap0), do:
+    %__MODULE__{bmap0 | root: nil, size: 0}
+
+
+  def surface(%__MODULE__{root: tnode} = bmap0) do
     {bmap, _mask} =
       Impl.stream_vertices(tnode)
       |> Enum.sort_by(fn interval(lower: lower, upper: upper, priority: priority) ->
         {-priority, lower, -upper}
       end)
-      |> Enum.reduce({new(), Bounds.Set.new()}, fn ival, {bmap0, mask0} = acc0 ->
+      |> Enum.reduce({clear(bmap0), Bounds.Set.new()}, fn ival, {bmap0, mask0} = acc0 ->
         if Bounds.Set.covers?(mask0, ival) do
           acc0
         else
@@ -170,6 +194,8 @@ defmodule Bounds.Map do
     Impl.stream_vertices(tnode)
   end
 
+  defp do_match_reduce(:intervals, result_set, _orig_bmap), do:
+    result_set
   defp do_match_reduce(:triples, result_set, _orig_bmap) do
     Enum.map(result_set, fn interval(lower: lower, upper: upper, priority: priority, value: value) ->
       {%Bounds{lower: lower, upper: upper}, priority, value}
