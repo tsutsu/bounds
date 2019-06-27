@@ -100,6 +100,29 @@ defmodule Bounds.Map do
   end
 
 
+  def surface(%__MODULE__{root: tnode}) do
+    {bmap, _mask} =
+      Impl.stream_vertices(tnode)
+      |> Enum.sort_by(fn interval(lower: lower, upper: upper, priority: priority) ->
+        {-priority, lower, -upper}
+      end)
+      |> Enum.reduce({new(), Bounds.Set.new()}, fn ival, {bmap0, mask0} = acc0 ->
+        if Bounds.Set.covers?(mask0, ival) do
+          acc0
+        else
+          clipped_ival_parts = Bounds.Set.clip(mask0, ival, as: :negative)
+          mask1 = Bounds.Set.set(mask0, ival)
+          bmap1 = Enum.reduce(clipped_ival_parts, bmap0, fn part, acc ->
+            insert(acc, part)
+          end)
+
+          {bmap1, mask1}
+        end
+      end)
+
+    bmap
+  end
+
 
   ## helpers
 
