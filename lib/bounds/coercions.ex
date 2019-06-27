@@ -17,3 +17,9 @@ Coerce.defcoercion(Range, Bounds) do
     {Bounds.from_range(range), bounds}
   end
 end
+
+Coerce.defcoercion(Bounds, Bounds.Set) do
+  def coerce(bounds, bset) do
+    {Bounds.Set.from_bounds(bounds), bset}
+  end
+end
