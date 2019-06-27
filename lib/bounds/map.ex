@@ -128,8 +128,9 @@ defmodule Bounds.Map do
     {bmap, _mask} =
       Impl.stream_vertices(tnode)
       |> Enum.sort_by(fn interval(lower: lower, upper: upper, priority: priority) ->
-        {-priority, lower, -upper}
+        {priority, -lower, upper}
       end)
+      |> Enum.reverse()
       |> Enum.reduce({clear(bmap0), Bounds.Set.new()}, fn ival, {bmap0, mask0} = acc0 ->
         if Bounds.Set.covers?(mask0, ival) do
           acc0
