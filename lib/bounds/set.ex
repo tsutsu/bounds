@@ -40,7 +40,7 @@ defmodule Bounds.Set do
   end
 
 
-  def from_map(%{root: tnode}, opts \\ []) do
+  def from_bounds_map(%{root: tnode}, opts \\ []) do
     v_stream = Impl.stream_vertices(tnode)
 
     case Keyword.fetch(opts, :as) do
