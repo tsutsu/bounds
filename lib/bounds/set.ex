@@ -19,6 +19,17 @@ defmodule Bounds.Set do
   end
 
 
+  def from_mapset(%MapSet{} = set) do
+    {root, segments} =
+      Enum.reduce(set, {nil, 0}, fn boundable, impl_acc ->
+        {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
+        Impl.insert(impl_acc, interval(lower: lower, upper: upper))
+      end)
+
+    %__MODULE__{root: root, segments: segments}
+  end
+
+
   def from_bounds(interval() = ival) do
     {tnode0, size0} = Impl.insert({nil, 0}, ival)
     %__MODULE__{root: tnode0, segments: size0}
