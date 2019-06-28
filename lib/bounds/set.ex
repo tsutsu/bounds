@@ -71,6 +71,27 @@ defmodule Bounds.Set do
   end
 
 
+  def covers_intervals(%__MODULE__{root: tnode}) do
+    Impl.stream_vertices(tnode)
+    |> Stream.map(fn interval(lower: lower, upper: upper) ->
+      %Bounds{lower: lower, upper: upper}
+    end)
+    |> Enum.into(MapSet.new())
+  end
+
+
+  def covers_points(%__MODULE__{root: tnode}) do
+    Impl.stream_vertices(tnode)
+    |> Stream.flat_map(fn interval(lower: lower, upper: upper) ->
+      Enum.map(lower..(upper - 1), fn i ->
+        %Bounds{lower: i, upper: i}
+      end)
+    end)
+    |> Enum.into(MapSet.new())
+  end
+
+
+
   def set(%__MODULE__{root: tnode0, segments: size0}, interval(lower: lower, upper: upper) = ival) do
     existing_ivals = Impl.overlaps(tnode0, interval(lower: :erlang.max(lower - 1, 0), upper: upper + 1))
     new_ival = concat_ivals([ival | existing_ivals])
