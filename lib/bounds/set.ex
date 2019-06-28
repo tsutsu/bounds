@@ -19,14 +19,29 @@ defmodule Bounds.Set do
   end
 
 
-  def from_mapset(%MapSet{} = set) do
+  def from_covered_points(enum) do
     {root, segments} =
-      Enum.reduce(set, {nil, 0}, fn boundable, impl_acc ->
-        {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
-        Impl.insert(impl_acc, interval(lower: lower, upper: upper))
+      as_ival_stream(enum)
+      |> Enum.uniq()
+      |> Enum.reduce([], fn
+        interval(lower: b, upper: upper), [interval(lower: lower, upper: a) | ivals] when a + 1 == b ->
+          [interval(lower: lower, upper: upper) | ivals]
+        ival, ivals ->
+          [ival | ivals]
+      end)
+      |> Enum.reduce({nil, 0}, fn ival, impl_acc ->
+        Impl.insert(impl_acc, ival)
       end)
 
     %__MODULE__{root: root, segments: segments}
+  end
+
+
+  def from_covered_intervals(enum) do
+    as_ival_stream(enum)
+    |> Enum.reduce(new(), fn ival, bset_acc ->
+      set(bset_acc, ival)
+    end)
   end
 
 
@@ -219,6 +234,13 @@ defmodule Bounds.Set do
 
 
   ## helpers
+
+  defp as_ival_stream(boundable_enum) do
+    Stream.map(boundable_enum, fn boundable ->
+      {%Bounds{lower: lower, upper: upper}, _} = Coerce.coerce(boundable, %Bounds{})
+      interval(lower: lower, upper: upper)
+    end)
+  end
 
   defp concat_ivals(ivals) do
     agg_lower = Enum.map(ivals, fn interval(lower: lower) -> lower end) |> Enum.min()
