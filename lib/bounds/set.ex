@@ -180,6 +180,11 @@ defmodule Bounds.Set do
     complement(bset)
   end
 
+  def extent(%__MODULE__{root: tnode}) do
+    interval(lower: min_lower) = Impl.min_ival(tnode)
+    interval(upper: max_upper) = Impl.max_ival(tnode)
+    Bounds.new(min_lower, max_upper)
+  end
 
   def difference(%__MODULE__{} = a, %__MODULE__{root: b_tnode}) do
     Impl.stream_vertices(b_tnode)
