@@ -18,7 +18,8 @@ defmodule Bounds.Slice do
     end
   end
 
-  def from_binary(bin), do: Bounds.SlicedBinary.base(bin)
+  def from_binary(bin), do: Bounds.SlicedBitString.base(bin)
+  def from_bitstring(bs), do: Bounds.SlicedBitString.base(bs)
   def from_enum(enum, size \\ nil), do: Bounds.SlicedEnumerable.base(enum, size)
   def from_stream(enum), do: Bounds.SlicedEnumerable.base(enum, :infinity)
 end
