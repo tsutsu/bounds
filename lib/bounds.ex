@@ -153,6 +153,9 @@ defmodule Bounds do
   def range?(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do: true
 
 
+  @elixir_version Version.parse!(System.version())
+  @new_range_struct_at_version Version.parse!("1.12.0")
+
   @doc ~S"""
   Given a [range-bounded](#module-point-bounds) Bounds value, returns the `Range` value equivalent
   to it.
@@ -161,9 +164,14 @@ defmodule Bounds do
   """
   def to_range(%__MODULE__{lower: point, upper: point} = bounds), do:
     raise ArgumentError, "cannot convert #{inspect bounds} to Range"
-  def to_range(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do:
-    %Range{first: lower, last: (upper - 1)}
 
+  if Version.compare(@elixir_version, @new_range_struct_at_version) != :lt do
+    def to_range(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do:
+      %Range{first: lower, last: (upper - 1), step: 1}
+  else
+    def to_range(%__MODULE__{lower: lower, upper: upper}) when lower < upper, do:
+      %Range{first: lower, last: (upper - 1)}
+  end
 
   @doc ~S"""
   Filters the passed `Map` or `Enumerable` value for only [range-bounded](#module-point-bounds) Bounds values.
