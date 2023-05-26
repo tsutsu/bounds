@@ -17,4 +17,3 @@ defmodule Bounds.Map.Records do
     right: nil
   ]
 end
-
